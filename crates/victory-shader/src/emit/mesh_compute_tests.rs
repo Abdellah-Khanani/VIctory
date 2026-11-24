@@ -654,8 +654,11 @@ fn a_mesh_program_run_as_compute_writes_its_vertices_and_triangles() {
 #[test]
 fn mesh_compute_initializes_more_primitive_slots_than_lanes() {
     let (cs, layout) = lowered_with_max_primitives(true, false, 4);
-    let host = Host::new(false).expect("hardware");
+    let host = Host::new(false)
+        .or_else(|_| Host::new(true))
+        .expect("an SM 6.6 hardware or WARP device");
     let [_, indices] = run_compute(&host, &cs, &layout, 2).unwrap();
+    assert_eq!(indices.len(), 24);
     for (group, records) in indices.chunks_exact(12).enumerate() {
         let base = 3 * group as u32;
         assert_eq!(&records[..3], &[base, base + 1, base + 2]);

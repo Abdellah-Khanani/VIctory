@@ -449,14 +449,19 @@ impl State {
             self.host_heaps = self.heaps;
             self.host_roots = [0; 2];
         }
-        let root = p.root.as_raw() as usize;
+        // A mesh fallback's compute pass has a root signature of its own.
+        let root_sig = match &p.fallback {
+            Some(f) if compute && !p.compute => &f.compute_root,
+            _ => &p.root,
+        };
+        let root = root_sig.as_raw() as usize;
         if self.host_roots[usize::from(compute)] != root {
             // SAFETY: an open list and a live root signature.
             unsafe {
                 if compute {
-                    l.SetComputeRootSignature(&p.root);
+                    l.SetComputeRootSignature(root_sig);
                 } else {
-                    l.SetGraphicsRootSignature(&p.root);
+                    l.SetGraphicsRootSignature(root_sig);
                 }
             }
             self.host_roots[usize::from(compute)] = root;
@@ -470,7 +475,7 @@ impl State {
             list.used_pipeline(&p.name);
             // The title may release the pipeline before it submits the list.
             list.keep(pso);
-            list.keep(&p.root);
+            list.keep(root_sig);
         }
         for stage in stages {
             let t = stage.translated();
@@ -687,6 +692,7 @@ impl State {
         // SAFETY: an open list; the chunk is back in UNORDERED_ACCESS for the
         // list's next draws.
         unsafe { l.ResourceBarrier(&[transition(buffer, read, uav)]) };
+        list.mesh_scratch_recycle();
         drawn
     }
 
@@ -828,6 +834,7 @@ impl State {
         // Both chunks back in UNORDERED_ACCESS for the list's next draws.
         // SAFETY: an open list and a live buffer.
         unsafe { l.ResourceBarrier(&[transition(commands_buffer, argument, uav)]) };
+        list.mesh_scratch_recycle();
         drawn
     }
 

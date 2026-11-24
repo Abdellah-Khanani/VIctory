@@ -659,7 +659,7 @@ fn mesh_compute_initializes_more_primitive_slots_than_lanes() {
         .expect("an SM 6.6 hardware or WARP device");
     let [_, indices] = run_compute(&host, &cs, &layout, 2).unwrap();
     assert_eq!(indices.len(), 24);
-    for (group, records) in indices.chunks_exact(12).enumerate() {
+    for (group, records) in indices.as_chunks::<12>().0.iter().enumerate() {
         let base = 3 * group as u32;
         assert_eq!(&records[..3], &[base, base + 1, base + 2]);
         assert_eq!(&records[3..], &[0; 9], "unused indices, group {group}");
